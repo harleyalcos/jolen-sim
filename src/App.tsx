@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } from 'react';
 import './styles.css';
 import {
   planNextTap,
@@ -875,6 +875,96 @@ const STORAGE_KEY_P1 = 'awakening_p1_board';
 const STORAGE_KEY_P2 = 'awakening_p2_board';
 const STORAGE_KEY_P3 = 'awakening_p3_board_v2';
 const STORAGE_KEY_AUTO = 'awakening_auto_mode';
+function getTipExplanation(
+  bestIndex: number,
+  cells: CellDef[],
+  board: Record<string, number>,
+  affected: number[][],
+  goal: number,
+  totalStars: number,
+): ReactNode {
+  const cell = cells[bestIndex];
+  if (!cell) return null;
+
+  const affectedIndices = affected[bestIndex] ?? [bestIndex];
+  const affectedCells = affectedIndices.map((i) => cells[i]);
+  const affectedStars = affectedCells.map((c) => ({
+    id: c.id,
+    star: board[c.id] ?? 0,
+  }));
+
+  const allBoardStars = cells.map((c) => board[c.id] ?? 0);
+  const minStarOnBoard = Math.min(...allBoardStars);
+  const count6OnBoard = allBoardStars.filter((s) => s === 6).length;
+
+  const affected6 = affectedStars.filter((c) => c.star === 6);
+  const affected5 = affectedStars.filter((c) => c.star === 5);
+  const affectedBottlenecks = affectedStars.filter((c) => c.star <= Math.max(3, minStarOnBoard));
+
+  const deficit = goal - totalStars;
+
+  // Case 1: Striking distance
+  if (deficit <= affectedIndices.length * (6 - minStarOnBoard) && deficit <= 6) {
+    const safeMsg =
+      affected6.length === 0 && count6OnBoard > 0
+        ? ' while safely protecting all 6★ nodes.'
+        : '.';
+    return (
+      <>
+        Within striking distance (<strong>{deficit}★</strong> needed). Tapping{' '}
+        <strong>Cell {cell.id}</strong> rerolls {affectedIndices.length} node
+        {affectedIndices.length === 1 ? '' : 's'} to close the gap{safeMsg}
+      </>
+    );
+  }
+
+  // Case 2: Endgame (no cells below 5★)
+  if (minStarOnBoard >= 5) {
+    if (affected5.length > 0) {
+      const fiveList = affected5.map((c) => `Cell ${c.id}`).join(', ');
+      return (
+        <>
+          Targets <strong>{fiveList}</strong> (5★) to roll for 6★ upgrades{' '}
+          {affected6.length === 0
+            ? 'with zero risk to existing 6★ nodes.'
+            : `with only ${affected6.length} 6★ node${affected6.length === 1 ? '' : 's'} at risk.`}
+        </>
+      );
+    }
+  }
+
+  // Case 3: Bottleneck clearing
+  const hitsLowest = affectedStars.some((c) => c.star === minStarOnBoard);
+  const lowestList = affectedBottlenecks.map((c) => `${c.id} (${c.star}★)`).join(', ');
+
+  const safety =
+    affected6.length === 0 && count6OnBoard > 0
+      ? ' while safely protecting all 6★ nodes.'
+      : affected6.length > 0
+      ? ` with minimal collateral risk (${affected6.length} 6★ affected).`
+      : '.';
+
+  return (
+    <>
+      {hitsLowest && affectedBottlenecks.length > 0 ? (
+        <>
+          Rerolls {affectedBottlenecks.length === 1 ? 'bottleneck node ' : 'low-star bottlenecks ('}
+          <strong>{lowestList}</strong>
+          {affectedBottlenecks.length === 1 ? '' : ')'}
+        </>
+      ) : affectedBottlenecks.length > 0 ? (
+        <>
+          Rerolls low nodes (<strong>{lowestList}</strong>) for expected star growth
+        </>
+      ) : (
+        <>
+          Rerolls <strong>{affectedIndices.length}</strong> nodes for maximum expected gain
+        </>
+      )}
+      {safety}
+    </>
+  );
+}
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<number>(() => {
@@ -984,7 +1074,18 @@ export default function App() {
   }, [boardKey, isMaxed, activeGoal, activeAffected, activeCells]);
 
   const bestMove = plan ? activeCells[plan.bestIndex] : null;
-  const bestMoveEstimate = plan?.moves[0] ?? null;
+
+  const tipExplanation = useMemo(() => {
+    if (!plan || isMaxed) return null;
+    return getTipExplanation(
+      plan.bestIndex,
+      activeCells,
+      currentBoard,
+      activeAffected,
+      activeGoal,
+      totalStars,
+    );
+  }, [plan, isMaxed, activeCells, currentBoard, activeAffected, activeGoal, totalStars]);
 
   // Persist current page & boards & auto mode
   useEffect(() => {
@@ -1742,7 +1843,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Advisor Card / Maxed Notice */}
+              {/* Tip / Recommendation Card or Maxed Notice */}
               {isMaxed ? (
                 <div className="advisor-card is-maxed">
                   <div className="advisor-header">
@@ -1760,59 +1861,28 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              ) : bestMove && bestMoveEstimate ? (
-                <div className="advisor-card">
+              ) : bestMove && tipExplanation ? (
+                <div className="advisor-card tip-card">
                   <div className="advisor-header">
                     <span className="advisor-badge">
-                      <span className="sparkle">✦</span> SUGGESTED NEXT TAP
+                      <span className="sparkle">✦</span> TIP: CELL {bestMove.id}
                     </span>
-                    <span className="advisor-target-tag">GOAL: LEVEL {activeGoal}</span>
-                  </div>
-
-                  <div className="advisor-body">
-                    <div className="advisor-best-row">
-                      <div className="best-cell-indicator">
-                        <span className="best-cell-prefix">NEXT TAP</span>
-                        <span className="best-cell-id">CELL {bestMove.id}</span>
-                      </div>
-                      <div className="best-chance-block">
-                        <span className="chance-number">~{Math.round(bestMoveEstimate.estimatedAnima)}</span>
-                        <span className="chance-label">ANIMA TO REACH {activeGoal}★</span>
-                      </div>
-                    </div>
-
-                    <div className="advisor-stats-row">
-                      <div className="stat-pill">
-                        THIS TAP: <strong>{bestMoveEstimate.affectedCells} ANIMA</strong>
-                      </div>
-                      <div className="stat-pill">
-                        EST. GOLD: <strong>~{Math.round(bestMoveEstimate.estimatedGold).toLocaleString()}</strong>
-                      </div>
-                      <div className="stat-pill">
-                        EST. TAPS: <strong>~{Math.round(bestMoveEstimate.estimatedTaps)}</strong>
-                      </div>
-                    </div>
-                    <div className="advisor-estimate-note">
-                      {plan?.closeCall ? 'Close call: other cells have similar estimated costs. ' : ''}
-                      Estimated cost includes this tap.
-                    </div>
-
                     {selectedCellId !== bestMove.id && (
                       <button
                         type="button"
-                        className="btn-switch-best"
+                        className="btn-select-tip"
                         onClick={() => handleSetSelectedCell(bestMove.id)}
+                        title={`Select Cell ${bestMove.id} on board`}
                       >
-                        SELECT SUGGESTED CELL {bestMove.id}
+                        SELECT
                       </button>
                     )}
                   </div>
+                  <div className="tip-explanation-body">
+                    {tipExplanation}
+                  </div>
                 </div>
-              ) : (
-                <div className="advisor-card" role="status">
-                  <span className="advisor-badge">COULD NOT CALCULATE A TAP</span>
-                </div>
-              )}
+              ) : null}
 
               {/* Odds Reference Note */}
               <div className="odds-reference-note">

@@ -1083,131 +1083,41 @@ body {
   font-size: 11px;
 }
 
-.advisor-target-tag {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #8a8c9b;
-  background: #161722;
-  border: 1px solid #292b3b;
-  padding: 2px 7px;
-  border-radius: 2px;
-}
-
-.advisor-body {
-  display: flex;
-  flex-direction: column;
+/* Tip Card & Explanation */
+.tip-card {
+  padding: 12px 14px;
   gap: 10px;
 }
 
-.advisor-best-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 0;
+.tip-explanation-body {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #c4c6d2;
 }
 
-.best-cell-indicator {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.best-cell-prefix {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  color: #707180;
-  text-transform: uppercase;
-}
-
-.best-cell-id {
-  font-size: 18px;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.01em;
-}
-
-.best-chance-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
-}
-
-.chance-number {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 20px;
-  font-weight: 800;
+.tip-explanation-body strong {
   color: #ffd447;
-  text-shadow: 0 0 10px rgba(255, 212, 71, 0.4);
+  font-weight: 700;
 }
 
-.chance-number.gain {
-  color: #45a172;
-  text-shadow: 0 0 10px rgba(69, 161, 114, 0.4);
-}
-
-.chance-number.loss {
-  color: #b85958;
-  text-shadow: 0 0 10px rgba(184, 89, 88, 0.4);
-}
-
-.chance-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: #787a89;
-  text-transform: uppercase;
-}
-
-.advisor-stats-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-
-.advisor-estimate-note {
-  color: #777987;
-  font-size: 10px;
-  line-height: 1.4;
-}
-
-.stat-pill {
-  background: #14151e;
-  border: 1px solid #22232f;
-  border-radius: 2px;
-  padding: 6px 4px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10px;
-  color: #8c8e9d;
-  text-align: center;
-}
-
-.stat-pill strong {
-  color: #ededed;
-}
-
-.btn-switch-best {
-  width: 100%;
-  height: 32px;
-  background: #161824;
-  border: 1px solid #33364c;
-  color: #ff8300;
+.btn-select-tip {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  border-radius: 2px;
+  letter-spacing: 0.08em;
+  background: rgba(255, 131, 0, 0.12);
+  color: #ff8300;
+  border: 1px solid rgba(255, 131, 0, 0.35);
+  border-radius: 3px;
+  padding: 3px 8px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.btn-switch-best:hover {
-  background: #232636;
+.btn-select-tip:hover {
+  background: rgba(255, 131, 0, 0.25);
   border-color: #ff8300;
-  color: #ffa133;
-  box-shadow: 0 0 12px rgba(255, 131, 0, 0.25);
+  color: #ffd447;
 }
 
 /* Awaken Button (Compact) */
