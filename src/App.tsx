@@ -9,13 +9,6 @@ import {
   STAR_PROBABILITIES,
   type PlanResult,
 } from './planner';
-import {
-  type PlannerWeights,
-  DEFAULT_PLANNER_WEIGHTS,
-  loadChampionWeights,
-  saveChampionWeights,
-} from './weights.ts';
-import { AiTrainingLab } from './components/AiTrainingLab.tsx';
 
 type Kind = 'sword' | 'shield' | 'drop';
 type CellDef = {
@@ -979,29 +972,16 @@ export default function App() {
   const isMaxed = totalStars >= activeGoal;
   const boardKey = activeCells.map((cell) => currentBoard[cell.id] ?? 0).join(',');
 
-  const [activeTab, setActiveTab] = useState<'calculator' | 'training'>('calculator');
-  const [activeWeights, setActiveWeights] = useState<PlannerWeights>(() => loadChampionWeights());
-  const activeWeightsRef = useRef<PlannerWeights>(activeWeights);
-  useEffect(() => {
-    activeWeightsRef.current = activeWeights;
-  }, [activeWeights]);
-
-  const handleApplyChampion = useCallback((weights: PlannerWeights) => {
-    setActiveWeights({ ...weights });
-    activeWeightsRef.current = { ...weights };
-    saveChampionWeights(weights);
-  }, []);
-
   // Instant calculation via high-performance Monte Carlo engine (<20ms)
   const plan = useMemo(() => {
     if (isMaxed) return null;
     try {
       const boardArr = activeCells.map((cell) => currentBoard[cell.id] ?? 0);
-      return planNextTap(boardArr, activeAffected, activeGoal, 100, 0x12345678, activeWeights);
+      return planNextTap(boardArr, activeAffected, activeGoal, 100, 0x12345678);
     } catch {
       return null;
     }
-  }, [boardKey, isMaxed, activeGoal, activeAffected, activeCells, activeWeights]);
+  }, [boardKey, isMaxed, activeGoal, activeAffected, activeCells]);
 
   const bestMove = plan ? activeCells[plan.bestIndex] : null;
   const bestMoveEstimate = plan?.moves[0] ?? null;
@@ -1095,7 +1075,7 @@ export default function App() {
       const boardArr = activeCells.map((cell) => tempBoard[cell.id] ?? 0);
       let planResult: PlanResult | null = null;
       try {
-        planResult = planNextTap(boardArr, activeAffected, activeGoal, 100, 0x12345678, activeWeightsRef.current);
+        planResult = planNextTap(boardArr, activeAffected, activeGoal, 100, 0x12345678);
       } catch {
         break;
       }
@@ -1173,7 +1153,7 @@ export default function App() {
       if (total < targetGoal) {
         try {
           const bArr = targetCells.map((cell) => targetBoard[cell.id] ?? cell.defaultStar);
-          const p = planNextTap(bArr, targetAffected, targetGoal, 100, 0x12345678, activeWeightsRef.current);
+          const p = planNextTap(bArr, targetAffected, targetGoal, 100, 0x12345678);
           if (p && targetCells[p.bestIndex]) {
             setSelectedCellIds((prev) => ({
               ...prev,
@@ -1233,7 +1213,7 @@ export default function App() {
       if (nextTotal < activeGoal) {
         try {
           const nextBoardArr = activeCells.map((cell) => nextBoard[cell.id] ?? 0);
-          const nextPlan = planNextTap(nextBoardArr, activeAffected, activeGoal, 100, 0x12345678, activeWeightsRef.current);
+          const nextPlan = planNextTap(nextBoardArr, activeAffected, activeGoal, 100, 0x12345678);
           if (nextPlan && activeCells[nextPlan.bestIndex]) {
             const nextBestId = activeCells[nextPlan.bestIndex].id;
             setSelectedCellIds((prev) => ({
@@ -1272,7 +1252,7 @@ export default function App() {
       if (prevTotal < activeGoal) {
         try {
           const prevBoardArr = activeCells.map((cell) => previous.board[cell.id] ?? 0);
-          const prevPlan = planNextTap(prevBoardArr, activeAffected, activeGoal, 100, 0x12345678, activeWeightsRef.current);
+          const prevPlan = planNextTap(prevBoardArr, activeAffected, activeGoal, 100, 0x12345678);
           if (prevPlan && activeCells[prevPlan.bestIndex]) {
             const prevBestId = activeCells[prevPlan.bestIndex].id;
             setSelectedCellIds((prev) => ({
@@ -1311,7 +1291,7 @@ export default function App() {
     if (autoMode) {
       try {
         const blankBoardArr = activeCells.map((cell) => blank[cell.id] ?? 0);
-        const blankPlan = planNextTap(blankBoardArr, activeAffected, activeGoal, 100, 0x12345678, activeWeightsRef.current);
+        const blankPlan = planNextTap(blankBoardArr, activeAffected, activeGoal, 100, 0x12345678);
         if (blankPlan && activeCells[blankPlan.bestIndex]) {
           const blankBestId = activeCells[blankPlan.bestIndex].id;
           setSelectedCellIds((prev) => ({
@@ -1355,7 +1335,7 @@ export default function App() {
     const boardArr = activeCells.map((cell) => boardState[cell.id] ?? 0);
     let planResult: PlanResult | null = null;
     try {
-      planResult = planNextTap(boardArr, activeAffected, activeGoal, 100, 0x12345678, activeWeightsRef.current);
+      planResult = planNextTap(boardArr, activeAffected, activeGoal, 100, 0x12345678);
     } catch {
       stopAutoSimulate();
       return;
@@ -1412,7 +1392,7 @@ export default function App() {
 
     try {
       const nextArr = activeCells.map((cell) => nextBoard[cell.id] ?? 0);
-      const nextPlan = planNextTap(nextArr, activeAffected, activeGoal, 100, 0x12345678, activeWeightsRef.current);
+      const nextPlan = planNextTap(nextArr, activeAffected, activeGoal, 100, 0x12345678);
       if (nextPlan && activeCells[nextPlan.bestIndex]) {
         setSelectedCellIds((prev) => ({
           ...prev,
@@ -1446,36 +1426,12 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <div className="header-left-group">
-          <div className="brand">JOLEN SIMULATOR</div>
-          {activeTab === 'calculator' && (
-            <PageDropdown currentPage={currentPage} onSelectPage={handlePageChange} />
-          )}
-        </div>
-
-        <nav className="header-nav-tabs">
-          <button
-            type="button"
-            className={`nav-tab-btn ${activeTab === 'calculator' ? 'active' : ''}`}
-            onClick={() => setActiveTab('calculator')}
-          >
-            🎯 BOARD CALCULATOR
-          </button>
-          <button
-            type="button"
-            className={`nav-tab-btn ${activeTab === 'training' ? 'active' : ''}`}
-            onClick={() => setActiveTab('training')}
-          >
-            🧬 AI TRAINING LAB
-          </button>
-        </nav>
+        <div className="brand">JOLEN SIMULATOR</div>
+        <PageDropdown currentPage={currentPage} onSelectPage={handlePageChange} />
       </header>
 
       <main className="main">
-        <div
-          className="workspace"
-          style={{ display: activeTab === 'calculator' ? 'grid' : 'none' }}
-        >
+        <div className="workspace">
           {/* Left Side: Board Stage & Quick Star Editor */}
           <section className="board-section" aria-label={`Awakening page ${currentPage} board`}>
             <div className="panel-topline">
@@ -1485,11 +1441,6 @@ export default function App() {
               </div>
 
               <div className="topline-metrics">
-                {JSON.stringify(activeWeights) !== JSON.stringify(DEFAULT_PLANNER_WEIGHTS) && (
-                  <span className="ai-active-badge" title="Live recommendations are boosted by evolved AI champion weights">
-                    ⚡ AI CHAMPION ACTIVE
-                  </span>
-                )}
                 <span className="metric-tag">
                   TOTAL: <strong>{totalStars}</strong> / {maxPossibleStars} ★
                 </span>
@@ -1895,16 +1846,6 @@ export default function App() {
           </aside>
         </div>
 
-        {/* AI Training Lab Tab View */}
-        <div
-          className="training-lab-wrapper"
-          style={{ display: activeTab === 'training' ? 'block' : 'none' }}
-        >
-          <AiTrainingLab
-            activeWeights={activeWeights}
-            onApplyChampion={handleApplyChampion}
-          />
-        </div>
       </main>
     </div>
   );
