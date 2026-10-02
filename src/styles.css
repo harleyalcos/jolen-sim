@@ -1083,21 +1083,145 @@ body {
   font-size: 11px;
 }
 
-/* Tip Card & Explanation */
-.tip-card {
+/* Comparison Cards Section */
+.comparison-cards-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.advisor-card.tip-card {
+  border-left: 3px solid #ff8300;
   padding: 12px 14px;
   gap: 10px;
 }
 
+.advisor-card.compare-card {
+  border-left: 3px solid #38bdf8;
+  background: linear-gradient(180deg, #0e121a 0%, #0a0d14 100%);
+  padding: 12px 14px;
+  gap: 10px;
+}
+
+.advisor-card.compare-card.is-empty {
+  border-left: 3px dashed #282a39;
+  background: rgba(14, 17, 24, 0.5);
+}
+
+.advisor-badge.compare {
+  color: #38bdf8;
+}
+
+.compare-icon {
+  font-size: 11px;
+}
+
+/* Stat Chances Grid */
+.stat-chances-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+
+.chance-pill {
+  background: #14151f;
+  border: 1px solid #232534;
+  border-radius: 3px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chance-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #727484;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chance-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ededed;
+}
+
+.chance-pill.gain .chance-val {
+  color: #34d399;
+}
+
+.chance-pill.loss .chance-val {
+  color: #f87171;
+}
+
+.chance-val.pos {
+  color: #34d399;
+}
+
+.chance-val.neg {
+  color: #fbbf24;
+}
+
+.chance-val.safe {
+  color: #34d399;
+}
+
+.chance-val.warn {
+  color: #f87171;
+}
+
+/* Affected Nodes Row */
+.affected-nodes-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 5px 8px;
+  border-radius: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.nodes-label {
+  color: #757788;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-size: 9px;
+}
+
+.nodes-list {
+  color: #dcdce2;
+  word-break: break-word;
+}
+
+/* Tip & Compare Explanations */
 .tip-explanation-body {
-  font-size: 12px;
-  line-height: 1.55;
+  font-size: 11px;
+  line-height: 1.5;
   color: #c4c6d2;
 }
 
 .tip-explanation-body strong {
   color: #ffd447;
   font-weight: 700;
+}
+
+.compare-comparison-body {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #b8bac8;
+  background: rgba(56, 189, 248, 0.05);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+
+.compare-comparison-body strong {
+  color: #38bdf8;
 }
 
 .btn-select-tip {
@@ -1118,6 +1242,63 @@ body {
   background: rgba(255, 131, 0, 0.25);
   border-color: #ff8300;
   color: #ffd447;
+}
+
+.btn-select-compare {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 3px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-select-compare:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+
+.compare-empty-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 14px 10px;
+  gap: 6px;
+}
+
+.compare-empty-icon {
+  font-size: 16px;
+  color: #55576a;
+}
+
+.compare-empty-title {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #8c8e9f;
+  text-transform: uppercase;
+}
+
+.compare-empty-text {
+  font-size: 11px;
+  color: #636577;
+  line-height: 1.45;
+  max-width: 260px;
+}
+
+/* Hover cell effect on SVG board */
+.active-cell.is-hovered .active-outer {
+  stroke: #38bdf8 !important;
+  stroke-width: 3px;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.7));
 }
 
 /* Awaken Button (Compact) */

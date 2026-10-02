@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useMemo, useCallback, type ReactNode } fro
 import './styles.css';
 import {
   planNextTap,
+  sumDistribution,
+  EXPECTED_STAR,
   GOLD_PER_CELL,
   PAGE_ONE_GOAL,
   PAGE_TWO_GOAL,
@@ -454,8 +456,10 @@ function Board({
   affectedNeighbors,
   animatingIds,
   bestMoveId,
+  hoveredCellId,
   onSelectCell,
   onSetCellStar,
+  onHoverCell,
 }: {
   cells: CellDef[];
   board: Record<string, number>;
@@ -463,8 +467,10 @@ function Board({
   affectedNeighbors: string[];
   animatingIds: string[];
   bestMoveId?: string;
+  hoveredCellId?: string | null;
   onSelectCell: (id: string) => void;
   onSetCellStar: (id: string, star: number) => void;
+  onHoverCell?: (id: string | null) => void;
 }) {
   const [radialPickerCellId, setRadialPickerCellId] = useState<string | null>(null);
 
@@ -530,6 +536,7 @@ function Board({
       viewBox={`${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`}
       role="img"
       aria-label="Awakening hex board with occupied cells"
+      onMouseLeave={() => onHoverCell?.(null)}
     >
       {ghost.map(({ x, y }) => (
         <polygon key={`${x}-${y}`} points={hex(x, y)} className="ghost-cell" />
@@ -541,11 +548,14 @@ function Board({
         const isAnimating = animatingIds.includes(cell.id);
         const isBestMove = cell.id === bestMoveId;
         const isRadialOpen = cell.id === radialPickerCellId;
+        const isHovered = cell.id === hoveredCellId;
 
         return (
           <g
             key={cell.id}
-            className={`active-cell star-${star} ${isSelected ? 'selected' : ''} ${isNeighbor ? 'neighbor-target' : ''} ${isAnimating ? 'pulse-awaken' : ''} ${isBestMove ? 'is-best-move' : ''} ${isRadialOpen ? 'has-radial-open' : ''}`}
+            className={`active-cell star-${star} ${isSelected ? 'selected' : ''} ${isNeighbor ? 'neighbor-target' : ''} ${isAnimating ? 'pulse-awaken' : ''} ${isBestMove ? 'is-best-move' : ''} ${isRadialOpen ? 'has-radial-open' : ''} ${isHovered ? 'is-hovered' : ''}`}
+            onMouseEnter={() => onHoverCell?.(cell.id)}
+            onMouseLeave={() => onHoverCell?.(null)}
             onClick={() => {
               if (radialPickerCellId) {
                 setRadialPickerCellId(null);
@@ -875,6 +885,105 @@ const STORAGE_KEY_P1 = 'awakening_p1_board';
 const STORAGE_KEY_P2 = 'awakening_p2_board';
 const STORAGE_KEY_P3 = 'awakening_p3_board_v2';
 const STORAGE_KEY_AUTO = 'awakening_auto_mode';
+
+export interface CellStats {
+  cellId: string;
+  affectedIds: string[];
+  affectedSummary: { id: string; star: number }[];
+  currentSum: number;
+  gainChance: number;
+  lossChance: number;
+  sameChance: number;
+  gainPercent: number;
+  lossPercent: number;
+  expectedDelta: number;
+  count6: number;
+  count5: number;
+  lowCount: number;
+}
+
+function computeCellStats(
+  cellId: string,
+  cells: CellDef[],
+  board: Record<string, number>,
+  affected: number[][],
+): CellStats | null {
+  const cellIndex = cells.findIndex((c) => c.id === cellId);
+  if (cellIndex === -1) return null;
+
+  const affectedIndices = affected[cellIndex] ?? [cellIndex];
+  const affectedCells = affectedIndices.map((i) => cells[i]);
+  const affectedSummary = affectedCells.map((c) => ({
+    id: c.id,
+    star: board[c.id] ?? c.defaultStar,
+  }));
+
+  const currentSum = affectedSummary.reduce((sum, c) => sum + c.star, 0);
+  const cellCount = affectedIndices.length;
+
+  const dist = sumDistribution(cellCount);
+  const gainChance = dist.reduce((sum, p, roll) => sum + (roll > currentSum ? p : 0), 0);
+  const lossChance = dist.reduce((sum, p, roll) => sum + (roll < currentSum ? p : 0), 0);
+  const sameChance = dist.reduce((sum, p, roll) => sum + (roll === currentSum ? p : 0), 0);
+  const expectedDelta = cellCount * EXPECTED_STAR - currentSum;
+
+  const count6 = affectedSummary.filter((c) => c.star === 6).length;
+  const count5 = affectedSummary.filter((c) => c.star === 5).length;
+  const lowCount = affectedSummary.filter((c) => c.star <= 3).length;
+
+  return {
+    cellId,
+    affectedIds: affectedSummary.map((c) => c.id),
+    affectedSummary,
+    currentSum,
+    gainChance,
+    lossChance,
+    sameChance,
+    gainPercent: Math.round(gainChance * 100),
+    lossPercent: Math.round(lossChance * 100),
+    expectedDelta,
+    count6,
+    count5,
+    lowCount,
+  };
+}
+
+function getComparisonInsight(
+  compareStats: CellStats,
+  tipStats: CellStats,
+  tipCellId: string,
+): string {
+  if (compareStats.cellId === tipCellId) {
+    return 'This is the recommended tip cell.';
+  }
+
+  const parts: string[] = [];
+
+  const gainDiff = tipStats.gainPercent - compareStats.gainPercent;
+  if (gainDiff > 0) {
+    parts.push(`${gainDiff}% lower gain chance than Cell ${tipCellId}`);
+  } else if (gainDiff < 0) {
+    parts.push(`${Math.abs(gainDiff)}% higher gain chance`);
+  }
+
+  if (compareStats.count6 > tipStats.count6) {
+    const riskDiff = compareStats.count6 - tipStats.count6;
+    parts.push(`risks ${riskDiff} maxed 6★ node${riskDiff > 1 ? 's' : ''}`);
+  }
+
+  const deltaDiff = tipStats.expectedDelta - compareStats.expectedDelta;
+  if (deltaDiff > 0.5) {
+    parts.push(
+      `lower expected yield (${compareStats.expectedDelta >= 0 ? '+' : ''}${compareStats.expectedDelta.toFixed(1)}★ vs ${tipStats.expectedDelta >= 0 ? '+' : ''}${tipStats.expectedDelta.toFixed(1)}★)`
+    );
+  }
+
+  if (parts.length === 0) {
+    return `Similar yield to Cell ${tipCellId}, but Cell ${tipCellId} provides better strategic positioning.`;
+  }
+
+  return `${parts.join(', ')}.`;
+}
 function getTipExplanation(
   bestIndex: number,
   cells: CellDef[],
@@ -986,6 +1095,8 @@ export default function App() {
     return false;
   });
 
+  const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
+
   const [boards, setBoards] = useState<Record<number, Record<string, number>>>(() => {
     let p1 = INITIAL_PAGE_ONE_BOARD;
     let p2 = INITIAL_PAGE_TWO_BOARD;
@@ -1086,6 +1197,18 @@ export default function App() {
       totalStars,
     );
   }, [plan, isMaxed, activeCells, currentBoard, activeAffected, activeGoal, totalStars]);
+
+  const tipStats = useMemo(() => {
+    if (!bestMove) return null;
+    return computeCellStats(bestMove.id, activeCells, currentBoard, activeAffected);
+  }, [bestMove, activeCells, currentBoard, activeAffected]);
+
+  const compareCellId = hoveredCellId ?? (selectedCellId !== bestMove?.id ? selectedCellId : null);
+  const compareCell = compareCellId ? activeCells.find((c) => c.id === compareCellId) ?? null : null;
+  const compareStats = useMemo(() => {
+    if (!compareCell) return null;
+    return computeCellStats(compareCell.id, activeCells, currentBoard, activeAffected);
+  }, [compareCell, activeCells, currentBoard, activeAffected]);
 
   // Persist current page & boards & auto mode
   useEffect(() => {
@@ -1570,8 +1693,10 @@ export default function App() {
                   affectedNeighbors={affectedNeighbors}
                   animatingIds={animatingIds}
                   bestMoveId={isMaxed ? undefined : bestMove?.id}
+                  hoveredCellId={hoveredCellId}
                   onSelectCell={handleSetSelectedCell}
                   onSetCellStar={handleSetCellStar}
+                  onHoverCell={setHoveredCellId}
                 />
               </div>
 
@@ -1861,25 +1986,127 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              ) : bestMove && tipExplanation ? (
-                <div className="advisor-card tip-card">
-                  <div className="advisor-header">
-                    <span className="advisor-badge">
-                      <span className="sparkle">✦</span> TIP: CELL {bestMove.id}
-                    </span>
-                    {selectedCellId !== bestMove.id && (
-                      <button
-                        type="button"
-                        className="btn-select-tip"
-                        onClick={() => handleSetSelectedCell(bestMove.id)}
-                        title={`Select Cell ${bestMove.id} on board`}
-                      >
-                        SELECT
-                      </button>
+              ) : bestMove && tipStats ? (
+                <div className="comparison-cards-wrapper">
+                  {/* Card 1: Tip Cell Stats */}
+                  <div className="advisor-card tip-card">
+                    <div className="advisor-header">
+                      <span className="advisor-badge">
+                        <span className="sparkle">✦</span> TIP: CELL {bestMove.id}
+                      </span>
+                      {selectedCellId !== bestMove.id && (
+                        <button
+                          type="button"
+                          className="btn-select-tip"
+                          onClick={() => handleSetSelectedCell(bestMove.id)}
+                          title={`Select Cell ${bestMove.id} on board`}
+                        >
+                          SELECT
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="stat-chances-grid">
+                      <div className="chance-pill gain">
+                        <span className="chance-label">GAIN CHANCE</span>
+                        <span className="chance-val">+{tipStats.gainPercent}%</span>
+                      </div>
+                      <div className="chance-pill loss">
+                        <span className="chance-label">LOSS CHANCE</span>
+                        <span className="chance-val">-{tipStats.lossPercent}%</span>
+                      </div>
+                      <div className="chance-pill delta">
+                        <span className="chance-label">EXP. CHANGE</span>
+                        <span className={`chance-val ${tipStats.expectedDelta >= 0 ? 'pos' : 'neg'}`}>
+                          {tipStats.expectedDelta >= 0 ? `+${tipStats.expectedDelta.toFixed(1)}` : tipStats.expectedDelta.toFixed(1)}★
+                        </span>
+                      </div>
+                      <div className="chance-pill risk">
+                        <span className="chance-label">6★ AT RISK</span>
+                        <span className={`chance-val ${tipStats.count6 > 0 ? 'warn' : 'safe'}`}>
+                          {tipStats.count6 > 0 ? `${tipStats.count6} node${tipStats.count6 > 1 ? 's' : ''}` : '0 (Safe)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="affected-nodes-row">
+                      <span className="nodes-label">AFFECTED:</span>
+                      <span className="nodes-list">
+                        {tipStats.affectedSummary.map((n) => `${n.id} (${n.star}★)`).join(', ')}
+                      </span>
+                    </div>
+
+                    {tipExplanation && (
+                      <div className="tip-explanation-body">
+                        {tipExplanation}
+                      </div>
                     )}
                   </div>
-                  <div className="tip-explanation-body">
-                    {tipExplanation}
+
+                  {/* Card 2: Hovered / Manual Comparison Cell */}
+                  <div className={`advisor-card compare-card ${compareStats ? 'has-data' : 'is-empty'}`}>
+                    {compareStats && compareCell ? (
+                      <>
+                        <div className="advisor-header">
+                          <span className="advisor-badge compare">
+                            <span className="compare-icon">🔍</span> {hoveredCellId ? 'HOVERED' : 'COMPARING'}: CELL {compareCell.id}
+                          </span>
+                          {selectedCellId !== compareCell.id && (
+                            <button
+                              type="button"
+                              className="btn-select-compare"
+                              onClick={() => handleSetSelectedCell(compareCell.id)}
+                              title={`Select Cell ${compareCell.id} on board`}
+                            >
+                              SELECT
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="stat-chances-grid">
+                          <div className="chance-pill gain">
+                            <span className="chance-label">GAIN CHANCE</span>
+                            <span className="chance-val">+{compareStats.gainPercent}%</span>
+                          </div>
+                          <div className="chance-pill loss">
+                            <span className="chance-label">LOSS CHANCE</span>
+                            <span className="chance-val">-{compareStats.lossPercent}%</span>
+                          </div>
+                          <div className="chance-pill delta">
+                            <span className="chance-label">EXP. CHANGE</span>
+                            <span className={`chance-val ${compareStats.expectedDelta >= 0 ? 'pos' : 'neg'}`}>
+                              {compareStats.expectedDelta >= 0 ? `+${compareStats.expectedDelta.toFixed(1)}` : compareStats.expectedDelta.toFixed(1)}★
+                            </span>
+                          </div>
+                          <div className="chance-pill risk">
+                            <span className="chance-label">6★ AT RISK</span>
+                            <span className={`chance-val ${compareStats.count6 > 0 ? 'warn' : 'safe'}`}>
+                              {compareStats.count6 > 0 ? `${compareStats.count6} node${compareStats.count6 > 1 ? 's' : ''}` : '0 (Safe)'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="affected-nodes-row">
+                          <span className="nodes-label">AFFECTED:</span>
+                          <span className="nodes-list">
+                            {compareStats.affectedSummary.map((n) => `${n.id} (${n.star}★)`).join(', ')}
+                          </span>
+                        </div>
+
+                        <div className="compare-comparison-body">
+                          <strong>vs. Tip Cell {bestMove.id}:</strong>{' '}
+                          {getComparisonInsight(compareStats, tipStats, bestMove.id)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="compare-empty-prompt">
+                        <span className="compare-empty-icon">🔍</span>
+                        <div className="compare-empty-title">MANUAL COMPARISON</div>
+                        <div className="compare-empty-text">
+                          Hover over any node on the board to compare its gain/loss chances side-by-side with Tip Cell {bestMove.id}.
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : null}
