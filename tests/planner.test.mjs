@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { GOLD_PER_CELL, PAGE_ONE_GOAL, PAGE_TWO_GOAL, PAGE_THREE_GOAL, planNextTap } from '../src/planner.ts';
+import { GOLD_PER_CELL, PAGE_ONE_GOAL, PAGE_TWO_GOAL, PAGE_THREE_GOAL, PAGE_FOUR_GOAL, PAGE_FIVE_GOAL, PAGE_SIX_GOAL, planNextTap } from '../src/planner.ts';
+
 
 test('page 1 stops recommending taps at its 80-star goal', () => {
   assert.equal(PAGE_ONE_GOAL, 80);
@@ -68,4 +69,31 @@ test('page 3 stops recommending taps at its 109-star goal', () => {
   const affected = Array.from({ length: 19 }, (_, i) => [i]);
   assert.equal(planNextTap(board, affected, PAGE_THREE_GOAL), null);
 });
+
+test('page 4 stops recommending taps at its 132-star goal', () => {
+  assert.equal(PAGE_FOUR_GOAL, 132);
+  // 23 cells on Page 4 with sum >= 132 (e.g. 22*6 = 132)
+  const board = Array(23).fill(6);
+  const affected = Array.from({ length: 23 }, (_, i) => [i]);
+  assert.equal(planNextTap(board, affected, PAGE_FOUR_GOAL), null);
+});
+
+test('page 5 stops recommending taps at its 121-star goal', () => {
+  assert.equal(PAGE_FIVE_GOAL, 121);
+  // 24 cells on Page 5 with sum >= 121
+  const board = Array(24).fill(6);
+  const affected = Array.from({ length: 24 }, (_, i) => [i]);
+  assert.equal(planNextTap(board, affected, PAGE_FIVE_GOAL), null);
+});
+
+test('page 6 stops recommending taps at its 179-star goal', () => {
+  assert.equal(PAGE_SIX_GOAL, 179);
+  // 31 cells on Page 6 with sum >= 179 (30 * 6 = 180)
+  const board = Array(31).fill(6);
+  const affected = Array.from({ length: 31 }, (_, i) => [i]);
+  assert.equal(planNextTap(board, affected, PAGE_SIX_GOAL), null);
+});
+
+
+
 

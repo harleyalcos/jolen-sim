@@ -3,6 +3,9 @@ export const GOLD_PER_CELL = 1_000;
 export const PAGE_ONE_GOAL = 80;
 export const PAGE_TWO_GOAL = 65;
 export const PAGE_THREE_GOAL = 109;
+export const PAGE_FOUR_GOAL = 132;
+export const PAGE_FIVE_GOAL = 121;
+export const PAGE_SIX_GOAL = 179;
 
 export const STAR_PROBABILITIES: readonly number[] = [0, 0.41, 0.20, 0.17, 0.10, 0.09, 0.03];
 export const EXPECTED_STAR = STAR_PROBABILITIES.reduce((sum, chance, star) => sum + star * chance, 0);

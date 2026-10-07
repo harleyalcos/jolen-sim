@@ -5,347 +5,28 @@ import {
   sumDistribution,
   EXPECTED_STAR,
   GOLD_PER_CELL,
-  PAGE_ONE_GOAL,
-  PAGE_TWO_GOAL,
-  PAGE_THREE_GOAL,
   STAR_PROBABILITIES,
   type PlanResult,
 } from './planner';
-
-type Kind = 'sword' | 'shield' | 'drop';
-type CellDef = {
-  id: string;
-  x: number;
-  y: number;
-  kind: Kind;
-  defaultStar: number;
-  isCenter?: boolean;
-};
-
-export interface Threshold {
-  level: number;
-  effects: { name: string; value: string }[];
-}
-
-// Page 1's sixteen occupied cells (sum = 60 stars default)
-const PAGE_ONE_CELLS: CellDef[] = [
-  { id: 'A', x: 771, y: 360, kind: 'sword', defaultStar: 6 },
-  { id: 'B', x: 1148, y: 360, kind: 'shield', defaultStar: 6 },
-  { id: 'C', x: 708, y: 470, kind: 'drop', defaultStar: 1 },
-  { id: 'D', x: 1210, y: 470, kind: 'sword', defaultStar: 1 },
-  { id: 'E', x: 646, y: 580, kind: 'drop', defaultStar: 2 },
-  { id: 'F', x: 1273, y: 580, kind: 'drop', defaultStar: 6 },
-  { id: 'G', x: 708, y: 690, kind: 'drop', defaultStar: 5 },
-  { id: 'H', x: 1210, y: 690, kind: 'drop', defaultStar: 3 },
-  { id: 'I', x: 646, y: 800, kind: 'drop', defaultStar: 4 },
-  { id: 'J', x: 896, y: 800, kind: 'shield', defaultStar: 4 },
-  { id: 'K', x: 1022, y: 800, kind: 'drop', defaultStar: 4 },
-  { id: 'L', x: 1273, y: 800, kind: 'drop', defaultStar: 4 },
-  { id: 'M', x: 708, y: 910, kind: 'drop', defaultStar: 1 },
-  { id: 'N', x: 834, y: 910, kind: 'sword', defaultStar: 5 },
-  { id: 'O', x: 1084, y: 910, kind: 'shield', defaultStar: 3 },
-  { id: 'P', x: 1210, y: 910, kind: 'drop', defaultStar: 5 },
-];
-
-// Page 2's thirteen occupied cells (sum = 58 stars default, from user screenshot)
-const PAGE_TWO_CELLS: CellDef[] = [
-  { id: 'A', x: 710, y: 470, kind: 'sword', defaultStar: 4 },
-  { id: 'B', x: 1212, y: 470, kind: 'shield', defaultStar: 6 },
-  { id: 'C', x: 772, y: 580, kind: 'drop', defaultStar: 6 },
-  { id: 'D', x: 897, y: 580, kind: 'sword', defaultStar: 5 },
-  { id: 'E', x: 1148, y: 580, kind: 'drop', defaultStar: 6 },
-  { id: 'F', x: 835, y: 690, kind: 'drop', defaultStar: 3 },
-  { id: 'G', x: 961, y: 690, kind: 'drop', defaultStar: 6, isCenter: true },
-  { id: 'H', x: 1086, y: 690, kind: 'drop', defaultStar: 6 },
-  { id: 'I', x: 772, y: 800, kind: 'drop', defaultStar: 1 },
-  { id: 'J', x: 1023, y: 800, kind: 'shield', defaultStar: 4 },
-  { id: 'K', x: 1148, y: 800, kind: 'drop', defaultStar: 1 },
-  { id: 'L', x: 710, y: 910, kind: 'sword', defaultStar: 5 },
-  { id: 'M', x: 1212, y: 910, kind: 'shield', defaultStar: 5 },
-];
-
-// Page 3's nineteen occupied cells (sum = 71 stars default, matching in-game heart layout)
-const PAGE_THREE_CELLS: CellDef[] = [
-  // Top humps
-  { id: 'A', x: 710, y: 250, kind: 'sword', defaultStar: 4 },
-  { id: 'B', x: 835, y: 250, kind: 'sword', defaultStar: 4 },
-  { id: 'C', x: 1086, y: 250, kind: 'drop', defaultStar: 3 },
-  { id: 'D', x: 1212, y: 250, kind: 'shield', defaultStar: 4 },
-
-  // Upper sides & center dip
-  { id: 'E', x: 647, y: 360, kind: 'shield', defaultStar: 4 },
-  { id: 'F', x: 898, y: 360, kind: 'sword', defaultStar: 3 },
-  { id: 'G', x: 1023, y: 360, kind: 'drop', defaultStar: 3 },
-  { id: 'H', x: 1274, y: 360, kind: 'drop', defaultStar: 4 },
-
-  // Center sunburst nodes & outer flanks
-  { id: 'I', x: 710, y: 470, kind: 'shield', defaultStar: 4 },
-  { id: 'J', x: 835, y: 470, kind: 'sword', defaultStar: 5, isCenter: true },
-  { id: 'K', x: 1086, y: 470, kind: 'shield', defaultStar: 3, isCenter: true },
-  { id: 'L', x: 1212, y: 470, kind: 'drop', defaultStar: 5 },
-
-  // Mid flanks
-  { id: 'M', x: 772, y: 580, kind: 'drop', defaultStar: 5 },
-  { id: 'N', x: 1149, y: 580, kind: 'drop', defaultStar: 6 },
-
-  // Lower taper
-  { id: 'O', x: 835, y: 690, kind: 'sword', defaultStar: 5 },
-  { id: 'P', x: 961, y: 690, kind: 'drop', defaultStar: 5 },
-  { id: 'Q', x: 1086, y: 690, kind: 'drop', defaultStar: 3 },
-
-  // Bottom tip
-  { id: 'R', x: 898, y: 800, kind: 'drop', defaultStar: 3 },
-  { id: 'S', x: 1023, y: 800, kind: 'shield', defaultStar: 4 },
-];
-
-const PAGE_ONE_THRESHOLDS: Threshold[] = [
-  { level: 14, effects: [{ name: 'Attack Power against Monsters', value: '5' }] },
-  { level: 23, effects: [{ name: 'Normal Attack Accuracy', value: '5' }] },
-  { level: 28, effects: [{ name: 'Skill Critical Hit', value: '3' }] },
-  { level: 31, effects: [{ name: 'HP Regen', value: '1' }] },
-  { level: 34, effects: [{ name: 'Attack Power against Monsters', value: '5' }] },
-  { level: 37, effects: [{ name: 'Normal Attack Critical Hit', value: '3' }] },
-  { level: 39, effects: [{ name: 'HP Potion Healing Increase Rate', value: '1%' }] },
-  { level: 42, effects: [{ name: 'Accuracy against Monsters', value: '5' }] },
-  { level: 44, effects: [{ name: 'Skill Attack', value: '5' }] },
-  { level: 46, effects: [{ name: 'Accuracy against Monsters', value: '5' }] },
-  { level: 48, effects: [{ name: 'Basic Attack', value: '5' }] },
-  { level: 50, effects: [{ name: 'Skill Accuracy', value: '5' }] },
-  { level: 51, effects: [{ name: 'Monster Defense', value: '5' }] },
-  { level: 53, effects: [{ name: 'Normal Attack Critical Hit', value: '5' }] },
-  { level: 55, effects: [{ name: 'Accuracy against Monsters', value: '10' }] },
-  { level: 56, effects: [{ name: 'Skill Critical Hit', value: '5' }] },
-  { level: 58, effects: [{ name: 'Basic Attack', value: '10' }] },
-  { level: 59, effects: [{ name: 'Skill Defense', value: '10' }] },
-  { level: 61, effects: [{ name: 'Basic Attack Defense', value: '10' }] },
-  { level: 62, effects: [{ name: 'Skill Attack', value: '10' }] },
-  {
-    level: 64,
-    effects: [
-      { name: 'Increase HP Potion Healing', value: '3%' },
-      { name: 'Basic Attack Critical Hit Resistance', value: '5' },
-    ],
-  },
-  {
-    level: 66,
-    effects: [
-      { name: 'Skill Accuracy', value: '15' },
-      { name: 'Skill Evasion', value: '3' },
-    ],
-  },
-  { level: 68, effects: [{ name: 'Skill Critical Hit', value: '10' }] },
-  {
-    level: 69,
-    effects: [
-      { name: 'Max HP', value: '90' },
-      { name: 'Skill Critical Hit', value: '2' },
-    ],
-  },
-  {
-    level: 70,
-    effects: [
-      { name: 'Attack Power against Monsters', value: '20' },
-      { name: 'Skill Defense', value: '5' },
-    ],
-  },
-  {
-    level: 71,
-    effects: [
-      { name: 'Normal Attack Accuracy', value: '20' },
-      { name: 'Normal Attack Critical Hit', value: '2' },
-    ],
-  },
-  {
-    level: 73,
-    effects: [
-      { name: 'HP Potion Healing Increase Rate', value: '1.5%' },
-      { name: 'HP Regen', value: '2' },
-    ],
-  },
-  {
-    level: 74,
-    effects: [
-      { name: 'Monster Evasion', value: '25' },
-      { name: 'Normal Attack Accuracy', value: '8' },
-    ],
-  },
-  {
-    level: 75,
-    effects: [
-      { name: 'Normal Attack Evasion', value: '25' },
-      { name: 'Attack Power against Monsters', value: '5' },
-    ],
-  },
-  {
-    level: 76,
-    effects: [
-      { name: 'Monster Defense', value: '30' },
-      { name: 'Accuracy against Monsters', value: '5' },
-    ],
-  },
-  { level: 77, effects: [{ name: 'MP Regen', value: '10' }] },
-  { level: 79, effects: [{ name: 'Bonus Awakening Attributes', value: 'Unlocked' }] },
-  { level: 80, effects: [{ name: 'Final Awakening Milestone', value: 'Max' }] },
-];
-
-const PAGE_TWO_THRESHOLDS: Threshold[] = [
-  { level: 12, effects: [{ name: 'Basic Attack', value: '5' }] },
-  { level: 23, effects: [{ name: 'Skill Defense', value: '5' }] },
-  { level: 28, effects: [{ name: 'Basic Attack Defense', value: '5' }] },
-  { level: 33, effects: [{ name: 'Skill Attack', value: '5' }] },
-  { level: 37, effects: [{ name: 'Normal Attack Accuracy', value: '5' }] },
-  { level: 41, effects: [{ name: 'Increase HP Potion Healing', value: '2%' }] },
-  { level: 44, effects: [{ name: 'Normal Attack Accuracy', value: '10' }] },
-  { level: 47, effects: [{ name: 'Skill Evasion', value: '10' }] },
-  { level: 50, effects: [{ name: 'Normal Attack Evasion', value: '10' }] },
-  { level: 53, effects: [{ name: 'Skill Accuracy', value: '10' }] },
-  { level: 56, effects: [{ name: 'Basic Attack', value: '15' }] },
-  {
-    level: 58,
-    effects: [
-      { name: 'Skill Attack', value: '20' },
-      { name: 'Skill Accuracy', value: '5' },
-    ],
-  },
-  {
-    level: 60,
-    effects: [
-      { name: 'Player Defense', value: '20' },
-      { name: 'Skill Attack', value: '5' },
-    ],
-  },
-  {
-    level: 62,
-    effects: [
-      { name: 'Basic Attack Defense', value: '25' },
-      { name: 'Normal Attack Evasion', value: '5' },
-    ],
-  },
-  { level: 63, effects: [{ name: 'Skill Defense', value: '25' }] },
-  { level: 64, effects: [{ name: 'Awakening Milestone', value: '64★' }] },
-  { level: 65, effects: [{ name: 'Final Awakening Milestone', value: 'Max' }] },
-];
-
-const PAGE_THREE_THRESHOLDS: Threshold[] = [
-  { level: 20, effects: [{ name: 'Attack Power against Monsters', value: '5' }] },
-  { level: 33, effects: [{ name: 'Basic Attack Defense', value: '5' }] },
-  { level: 39, effects: [{ name: 'Attack Power against Players', value: '5' }] },
-  { level: 43, effects: [{ name: 'Monster Critical Hit Resistance', value: '3' }] },
-  { level: 47, effects: [{ name: 'Accuracy', value: '5' }] },
-  { level: 51, effects: [{ name: 'Monster Evasion', value: '5' }] },
-  { level: 54, effects: [{ name: 'Normal Attack Accuracy', value: '5' }] },
-  { level: 58, effects: [{ name: 'Attack Power against Monsters', value: '5' }] },
-  { level: 60, effects: [{ name: 'Basic Attack', value: '5' }] },
-  { level: 63, effects: [{ name: 'MP Regen', value: '2' }] },
-  { level: 66, effects: [{ name: 'Critical Hit against Monsters', value: '5' }] },
-  { level: 68, effects: [{ name: 'Basic Attack', value: '10' }] },
-  { level: 71, effects: [{ name: 'Increase HP Potion Healing', value: '3%' }] },
-  { level: 73, effects: [{ name: 'Attack Power against Monsters', value: '15' }] },
-  { level: 75, effects: [{ name: 'Evasion', value: '15' }] },
-  { level: 78, effects: [{ name: 'Player Evasion', value: '15' }] },
-  { level: 80, effects: [{ name: 'Skill Attack', value: '15' }] },
-  { level: 82, effects: [{ name: 'Accuracy against Monsters', value: '15' }] },
-  { level: 84, effects: [{ name: 'Evasion', value: '15' }] },
-  { level: 86, effects: [{ name: 'MP Regen', value: '5' }] },
-  { level: 88, effects: [{ name: 'Monster Defense', value: '20' }] },
-  {
-    level: 89,
-    effects: [
-      { name: 'Basic Attack Defense', value: '20' },
-      { name: 'Monster Critical Hit Resistance', value: '2' },
-    ],
-  },
-  {
-    level: 91,
-    effects: [
-      { name: 'Accuracy against Players', value: '20' },
-      { name: 'Player Defense', value: '5' },
-    ],
-  },
-  { level: 93, effects: [{ name: 'Skill Defense', value: '25' }] },
-  {
-    level: 95,
-    effects: [
-      { name: 'MP Regen', value: '5' },
-      { name: 'Normal Attack Accuracy', value: '5' },
-    ],
-  },
-  {
-    level: 97,
-    effects: [
-      { name: 'Skill Accuracy', value: '30' },
-      { name: 'Accuracy against Players', value: '5' },
-    ],
-  },
-  {
-    level: 98,
-    effects: [
-      { name: 'Increase HP Potion Healing', value: '5%' },
-      { name: 'Skill Evasion', value: '10' },
-    ],
-  },
-  {
-    level: 100,
-    effects: [
-      { name: 'Skill Evasion', value: '35' },
-      { name: 'Basic Attack', value: '10' },
-    ],
-  },
-  {
-    level: 102,
-    effects: [
-      { name: 'Normal Attack Accuracy', value: '35' },
-      { name: 'Increase HP Potion Healing', value: '3%' },
-    ],
-  },
-  {
-    level: 103,
-    effects: [
-      { name: 'Accuracy', value: '35' },
-      { name: 'Evasion', value: '10' },
-    ],
-  },
-  {
-    level: 105,
-    effects: [
-      { name: 'Attack Power against Players', value: '45' },
-      { name: 'Player Evasion', value: '10' },
-    ],
-  },
-  {
-    level: 106,
-    effects: [
-      { name: 'Normal Attack Evasion', value: '45' },
-      { name: 'Skill Attack', value: '10' },
-    ],
-  },
-  { level: 108, effects: [{ name: 'Bonus Awakening Attributes', value: 'Unlocked' }] },
-  { level: 109, effects: [{ name: 'Final Awakening Milestone', value: 'Max' }] },
-];
-
-const INITIAL_PAGE_ONE_BOARD: Record<string, number> = Object.fromEntries(
-  PAGE_ONE_CELLS.map((cell) => [cell.id, cell.defaultStar]),
-);
-
-const INITIAL_PAGE_TWO_BOARD: Record<string, number> = Object.fromEntries(
-  PAGE_TWO_CELLS.map((cell) => [cell.id, cell.defaultStar]),
-);
-
-const INITIAL_PAGE_THREE_BOARD: Record<string, number> = Object.fromEntries(
-  PAGE_THREE_CELLS.map((cell) => [cell.id, cell.defaultStar]),
-);
-
-const BLANK_PAGE_ONE_BOARD: Record<string, number> = Object.fromEntries(
-  PAGE_ONE_CELLS.map((cell) => [cell.id, 0]),
-);
-
-const BLANK_PAGE_TWO_BOARD: Record<string, number> = Object.fromEntries(
-  PAGE_TWO_CELLS.map((cell) => [cell.id, 0]),
-);
-
-const BLANK_PAGE_THREE_BOARD: Record<string, number> = Object.fromEntries(
-  PAGE_THREE_CELLS.map((cell) => [cell.id, 0]),
-);
+import {
+  type Kind,
+  type CellDef,
+  type Threshold,
+  type ProcessedPageConfig,
+  type PageDefinition,
+  PAGES,
+  PAGES_BY_NUM,
+  RAW_PAGES,
+  MIN_PAGE,
+  MAX_PAGE,
+  TOTAL_PAGES_IN_GAME,
+  getNeighbors,
+  getEffectivePages,
+  getEffectiveRawPages,
+  saveCustomPage,
+  deleteCustomPage,
+} from './pagesData';
+import { PageBuilder } from './PageBuilder';
 
 const STARS = [1, 2, 3, 4, 5, 6] as const;
 
@@ -358,32 +39,6 @@ function rollStar(): number {
   }
   return 6;
 }
-
-function getNeighbors(cells: CellDef[], cellId: string): string[] {
-  const target = cells.find((c) => c.id === cellId);
-  if (!target) return [cellId];
-  return cells
-    .filter((c) => Math.hypot(c.x - target.x, c.y - target.y) < 135)
-    .map((c) => c.id);
-}
-
-const PAGE_ONE_AFFECTED = PAGE_ONE_CELLS.map((cell) =>
-  getNeighbors(PAGE_ONE_CELLS, cell.id).map((id) =>
-    PAGE_ONE_CELLS.findIndex((candidate) => candidate.id === id),
-  ),
-);
-
-const PAGE_TWO_AFFECTED = PAGE_TWO_CELLS.map((cell) =>
-  getNeighbors(PAGE_TWO_CELLS, cell.id).map((id) =>
-    PAGE_TWO_CELLS.findIndex((candidate) => candidate.id === id),
-  ),
-);
-
-const PAGE_THREE_AFFECTED = PAGE_THREE_CELLS.map((cell) =>
-  getNeighbors(PAGE_THREE_CELLS, cell.id).map((id) =>
-    PAGE_THREE_CELLS.findIndex((candidate) => candidate.id === id),
-  ),
-);
 
 const STAR_COLORS: Record<number, string> = {
   0: '#555869',
@@ -513,17 +168,21 @@ function Board({
   const minY = ys.length ? Math.min(...ys) : 250;
   const maxY = ys.length ? Math.max(...ys) : 910;
   const centerY = Math.round((minY + maxY) / 2);
-  const viewBoxHeight = Math.max(960, maxY - minY + 400);
+  const viewBoxHeight = Math.max(960, maxY - minY + 340);
   const viewBoxY = Math.round(centerY - viewBoxHeight / 2);
-  const viewBoxX = 275;
+  const xs = useMemo(() => cells.map((c) => c.x), [cells]);
+  const minX = xs.length ? Math.min(...xs) : 646;
+  const maxX = xs.length ? Math.max(...xs) : 1274;
+  const centerX = Math.round((minX + maxX) / 2);
   const viewBoxWidth = 1370;
+  const viewBoxX = Math.round(centerX - viewBoxWidth / 2);
 
   const ghost = useMemo(() => {
-    return Array.from({ length: 13 }, (_, i) => {
-      const row = i - 3; // -3 to 9 (covers y = -80 to 1240)
+    return Array.from({ length: 15 }, (_, i) => {
+      const row = i - 3; // -3 to 11 (covers y = -80 to 1460)
       const y = 250 + row * 110;
       const isOdd = Math.abs(row) % 2 === 1;
-      const startX = isOdd ? 395 : 333;
+      const startX = isOdd ? 395.5 : 333;
       return Array.from({ length: 11 }, (_, col) => ({ x: startX + col * 125.5, y }));
     })
       .flat()
@@ -542,7 +201,7 @@ function Board({
         <polygon key={`${x}-${y}`} points={hex(x, y)} className="ghost-cell" />
       ))}
       {cells.map((cell) => {
-        const star = board[cell.id] ?? cell.defaultStar;
+        const star = board[cell.id] ?? cell.defaultStar ?? 0;
         const isSelected = cell.id === selectedCellId;
         const isNeighbor = affectedNeighbors.includes(cell.id) && !isSelected;
         const isAnimating = animatingIds.includes(cell.id);
@@ -637,7 +296,7 @@ function Board({
       {radialPickerCellId && (() => {
         const target = cells.find((c) => c.id === radialPickerCellId);
         if (!target) return null;
-        const currentStar = board[target.id] ?? target.defaultStar;
+        const currentStar = board[target.id] ?? target.defaultStar ?? 0;
         const Rin = 76;
         const Rout = 150;
         const fanUp = target.y - Rout >= viewBoxY + 20;
@@ -730,26 +389,20 @@ function Board({
   );
 }
 
-interface PageOption {
-  page: number;
-  label: string;
-  nodeCount: number;
-  goalStars: number;
-  unlocked: boolean;
-}
-
-const PAGE_OPTIONS: PageOption[] = [
-  { page: 1, label: 'PAGE 01', nodeCount: 16, goalStars: 80, unlocked: true },
-  { page: 2, label: 'PAGE 02', nodeCount: 13, goalStars: 65, unlocked: true },
-  { page: 3, label: 'PAGE 03', nodeCount: 19, goalStars: 109, unlocked: true },
-];
-
 function PageDropdown({
   currentPage,
+  pages,
   onSelectPage,
+  onAddNewPage,
+  onOpenBuilder,
+  onDeleteCustomPage,
 }: {
   currentPage: number;
+  pages: ProcessedPageConfig[];
   onSelectPage: (page: number) => void;
+  onAddNewPage?: () => void;
+  onOpenBuilder?: () => void;
+  onDeleteCustomPage?: (pageNum: number) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -777,7 +430,7 @@ function PageDropdown({
     };
   }, [isOpen]);
 
-  const activeOption = PAGE_OPTIONS.find((p) => p.page === currentPage) ?? PAGE_OPTIONS[0];
+  const activeOption = pages.find((p) => p.page === currentPage) ?? pages[0];
 
   return (
     <div className="custom-page-dropdown" ref={dropdownRef}>
@@ -791,7 +444,7 @@ function PageDropdown({
       >
         <span className="trigger-badge">PAGE</span>
         <span className="trigger-num">{String(currentPage).padStart(2, '0')}</span>
-        <span className="trigger-total">/ 17</span>
+        <span className="trigger-total">/ {TOTAL_PAGES_IN_GAME}</span>
         <span className="trigger-sep">|</span>
         <span className="trigger-nodes">{activeOption.nodeCount} NODES</span>
         <svg
@@ -816,12 +469,13 @@ function PageDropdown({
         <div className="dropdown-menu-popover" role="listbox" aria-label="Awakening Pages">
           <div className="dropdown-menu-header">
             <span className="dropdown-menu-title">SELECT AWAKENING PAGE</span>
-            <span className="dropdown-menu-count">3 / 17 READY</span>
+            <span className="dropdown-menu-count">{pages.length} / {TOTAL_PAGES_IN_GAME} READY</span>
           </div>
 
           <div className="dropdown-options-list">
-            {PAGE_OPTIONS.map((opt) => {
+            {pages.map((opt) => {
               const isSelected = opt.page === currentPage;
+              const isCustom = !RAW_PAGES.some((rp) => rp.page === opt.page);
               return (
                 <div
                   key={opt.page}
@@ -850,6 +504,7 @@ function PageDropdown({
                   <div className="option-info-col">
                     <div className="option-title-row">
                       <span className="option-name">{opt.label}</span>
+                      {isCustom && <span className="option-status-tag custom">CUSTOM</span>}
                       {isSelected ? (
                         <span className="option-status-tag active">ACTIVE</span>
                       ) : (
@@ -859,7 +514,7 @@ function PageDropdown({
                     <div className="option-meta-row">
                       <span className="meta-nodes">{opt.nodeCount} Nodes</span>
                       <span className="meta-dot">·</span>
-                      <span className="meta-goal">{opt.goalStars}★ Goal</span>
+                      <span className="meta-goal">{opt.goalStars}★ {opt.isMaxFromCellCount ? 'Max' : 'Goal'}</span>
                     </div>
                   </div>
 
@@ -869,11 +524,55 @@ function PageDropdown({
                         ✓
                       </span>
                     )}
+                    {isCustom && onDeleteCustomPage && (
+                      <button
+                        type="button"
+                        className="option-del-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`Delete custom Page ${opt.page}?`)) {
+                            onDeleteCustomPage(opt.page);
+                          }
+                        }}
+                        title="Delete custom page"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {(onAddNewPage || onOpenBuilder) && (
+            <div className="dropdown-menu-footer">
+              {onAddNewPage && (
+                <button
+                  type="button"
+                  className="dropdown-add-page-btn"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onAddNewPage();
+                  }}
+                >
+                  ➕ Add New Page {pages.length < TOTAL_PAGES_IN_GAME ? `(Page ${pages[pages.length - 1].page + 1})` : ''}
+                </button>
+              )}
+              {onOpenBuilder && (
+                <button
+                  type="button"
+                  className="dropdown-builder-btn"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenBuilder();
+                  }}
+                >
+                  🛠️ Open Page Builder
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -881,9 +580,6 @@ function PageDropdown({
 }
 
 const STORAGE_KEY_PAGE = 'awakening_current_page';
-const STORAGE_KEY_P1 = 'awakening_p1_board';
-const STORAGE_KEY_P2 = 'awakening_p2_board';
-const STORAGE_KEY_P3 = 'awakening_p3_board_v2';
 const STORAGE_KEY_AUTO = 'awakening_auto_mode';
 
 export interface CellStats {
@@ -915,7 +611,7 @@ function computeCellStats(
   const affectedCells = affectedIndices.map((i) => cells[i]);
   const affectedSummary = affectedCells.map((c) => ({
     id: c.id,
-    star: board[c.id] ?? c.defaultStar,
+    star: board[c.id] ?? c.defaultStar ?? 0,
   }));
 
   const currentSum = affectedSummary.reduce((sum, c) => sum + c.star, 0);
@@ -1076,15 +772,43 @@ function getTipExplanation(
 }
 
 export default function App() {
+  const [pagesVersion, setPagesVersion] = useState(0);
+  const [isBuilderOpen, setIsBuilderOpen] = useState(false);
+
+  const pages = useMemo(() => getEffectivePages(), [pagesVersion]);
+  const pagesByNum = useMemo(
+    () => Object.fromEntries(pages.map((p) => [p.page, p])),
+    [pages],
+  );
+  const minPage = pages[0]?.page ?? 1;
+  const maxPage = pages[pages.length - 1]?.page ?? 6;
+
+  const [builderInitialPage, setBuilderInitialPage] = useState<number>(() => {
+    const effective = getEffectiveRawPages();
+    return (effective[effective.length - 1]?.page ?? 6) + 1;
+  });
+
+  const handleAddNewPage = () => {
+    const effective = getEffectiveRawPages();
+    const nextNum = (effective[effective.length - 1]?.page ?? 6) + 1;
+    setBuilderInitialPage(nextNum);
+    setIsBuilderOpen(true);
+  };
+
+  const handleOpenBuilderForCurrentPage = () => {
+    setBuilderInitialPage(currentPage);
+    setIsBuilderOpen(true);
+  };
+
   const [currentPage, setCurrentPage] = useState<number>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_PAGE);
       if (saved) {
         const p = Number(saved);
-        if (p >= 1 && p <= 3) return p;
+        if (p >= MIN_PAGE && p <= MAX_PAGE) return p;
       }
     } catch {}
-    return 3; // Default to Page 3
+    return MAX_PAGE; // Default to highest unlocked page
   });
 
   const [autoMode, setAutoMode] = useState<boolean>(() => {
@@ -1098,18 +822,26 @@ export default function App() {
   const [hoveredCellId, setHoveredCellId] = useState<string | null>(null);
 
   const [boards, setBoards] = useState<Record<number, Record<string, number>>>(() => {
-    let p1 = INITIAL_PAGE_ONE_BOARD;
-    let p2 = INITIAL_PAGE_TWO_BOARD;
-    let p3 = INITIAL_PAGE_THREE_BOARD;
+    const ZEROED_STORAGE_KEY = 'awakening_boards_zeroed_v1';
     try {
-      const saved1 = localStorage.getItem(STORAGE_KEY_P1);
-      if (saved1) p1 = JSON.parse(saved1);
-      const saved2 = localStorage.getItem(STORAGE_KEY_P2);
-      if (saved2) p2 = JSON.parse(saved2);
-      const saved3 = localStorage.getItem(STORAGE_KEY_P3);
-      if (saved3) p3 = JSON.parse(saved3);
+      if (!localStorage.getItem(ZEROED_STORAGE_KEY)) {
+        for (const p of PAGES) {
+          localStorage.removeItem(p.storageKey);
+        }
+        localStorage.setItem(ZEROED_STORAGE_KEY, 'true');
+      }
     } catch {}
-    return { 1: p1, 2: p2, 3: p3 };
+
+    const initial: Record<number, Record<string, number>> = {};
+    for (const p of PAGES) {
+      let b = p.initialBoard;
+      try {
+        const saved = localStorage.getItem(p.storageKey);
+        if (saved) b = JSON.parse(saved);
+      } catch {}
+      initial[p.page] = b;
+    }
+    return initial;
   });
 
   interface HistoryEntry {
@@ -1117,38 +849,29 @@ export default function App() {
     tapsAdded: number;
   }
 
-  const [histories, setHistories] = useState<Record<number, HistoryEntry[]>>({
-    1: [],
-    2: [],
-    3: [],
-  });
+  const [histories, setHistories] = useState<Record<number, HistoryEntry[]>>(() =>
+    Object.fromEntries(PAGES.map((p) => [p.page, []])),
+  );
 
-  const [tapCounts, setTapCounts] = useState<Record<number, number>>({
-    1: 0,
-    2: 0,
-    3: 0,
-  });
+  const [tapCounts, setTapCounts] = useState<Record<number, number>>(() =>
+    Object.fromEntries(PAGES.map((p) => [p.page, 0])),
+  );
 
-  const [selectedCellIds, setSelectedCellIds] = useState<Record<number, string>>({
-    1: 'L',
-    2: 'G',
-    3: 'J',
-  });
+  const [selectedCellIds, setSelectedCellIds] = useState<Record<number, string>>(() =>
+    Object.fromEntries(PAGES.map((p) => [p.page, p.defaultSelectedCellId])),
+  );
 
   const [animatingIds, setAnimatingIds] = useState<string[]>([]);
   const thresholdsListRef = useRef<HTMLDivElement>(null);
 
-  // Active configurations based on current page
-  const activeCells =
-    currentPage === 1 ? PAGE_ONE_CELLS : currentPage === 2 ? PAGE_TWO_CELLS : PAGE_THREE_CELLS;
-  const activeThresholds =
-    currentPage === 1 ? PAGE_ONE_THRESHOLDS : currentPage === 2 ? PAGE_TWO_THRESHOLDS : PAGE_THREE_THRESHOLDS;
-  const activeGoal =
-    currentPage === 1 ? PAGE_ONE_GOAL : currentPage === 2 ? PAGE_TWO_GOAL : PAGE_THREE_GOAL;
-  const activeAffected =
-    currentPage === 1 ? PAGE_ONE_AFFECTED : currentPage === 2 ? PAGE_TWO_AFFECTED : PAGE_THREE_AFFECTED;
+  // Active configurations based on current page from dynamic registry
+  const pageConfig = pagesByNum[currentPage] ?? pages[0];
+  const activeCells = pageConfig.cells;
+  const activeThresholds = pageConfig.thresholds;
+  const activeGoal = pageConfig.goalStars;
+  const activeAffected = pageConfig.affected;
 
-  const currentBoard = boards[currentPage] ?? {};
+  const currentBoard = boards[currentPage] ?? pageConfig.initialBoard;
   const currentHistory = histories[currentPage] ?? [];
   const currentTapCount = tapCounts[currentPage] ?? 0;
 
@@ -1219,11 +942,13 @@ export default function App() {
 
   useEffect(() => {
     try {
-      if (boards[1]) localStorage.setItem(STORAGE_KEY_P1, JSON.stringify(boards[1]));
-      if (boards[2]) localStorage.setItem(STORAGE_KEY_P2, JSON.stringify(boards[2]));
-      if (boards[3]) localStorage.setItem(STORAGE_KEY_P3, JSON.stringify(boards[3]));
+      for (const p of pages) {
+        if (boards[p.page]) {
+          localStorage.setItem(p.storageKey, JSON.stringify(boards[p.page]));
+        }
+      }
     } catch {}
-  }, [boards]);
+  }, [boards, pages]);
 
   useEffect(() => {
     try {
@@ -1360,32 +1085,64 @@ export default function App() {
 
   // Page switcher
   const handlePageChange = (newPage: number) => {
-    if (newPage < 1 || newPage > 3 || newPage === currentPage) return;
+    if (newPage < minPage || newPage > maxPage || newPage === currentPage) return;
     if (isAutoSimulatingRef.current) {
       stopAutoSimulate();
     }
     setCurrentPage(newPage);
-    if (autoMode) {
-      const targetCells =
-        newPage === 1 ? PAGE_ONE_CELLS : newPage === 2 ? PAGE_TWO_CELLS : PAGE_THREE_CELLS;
-      const targetGoal =
-        newPage === 1 ? PAGE_ONE_GOAL : newPage === 2 ? PAGE_TWO_GOAL : PAGE_THREE_GOAL;
-      const targetAffected =
-        newPage === 1 ? PAGE_ONE_AFFECTED : newPage === 2 ? PAGE_TWO_AFFECTED : PAGE_THREE_AFFECTED;
-      const targetBoard = boards[newPage] ?? {};
-      const total = Object.values(targetBoard).reduce((sum, s) => sum + s, 0);
-      if (total < targetGoal) {
+    if (!boards[newPage]) {
+      const cfg = pagesByNum[newPage];
+      if (cfg) {
+        let b = cfg.initialBoard;
         try {
-          const bArr = targetCells.map((cell) => targetBoard[cell.id] ?? cell.defaultStar);
-          const p = planNextTap(bArr, targetAffected, targetGoal, 100, 0x12345678);
-          if (p && targetCells[p.bestIndex]) {
+          const saved = localStorage.getItem(cfg.storageKey);
+          if (saved) b = JSON.parse(saved);
+        } catch {}
+        setBoards((prev) => ({ ...prev, [newPage]: b }));
+      }
+    }
+    if (autoMode) {
+      const targetConfig = pagesByNum[newPage];
+      if (!targetConfig) return;
+      const targetBoard = boards[newPage] ?? targetConfig.initialBoard;
+      const total = Object.values(targetBoard).reduce((sum, s) => sum + s, 0);
+      if (total < targetConfig.goalStars) {
+        try {
+          const bArr = targetConfig.cells.map((cell) => targetBoard[cell.id] ?? cell.defaultStar ?? 0);
+          const p = planNextTap(bArr, targetConfig.affected, targetConfig.goalStars, 100, 0x12345678);
+          if (p && targetConfig.cells[p.bestIndex]) {
             setSelectedCellIds((prev) => ({
               ...prev,
-              [newPage]: targetCells[p.bestIndex].id,
+              [newPage]: targetConfig.cells[p.bestIndex].id,
             }));
           }
         } catch {}
       }
+    }
+  };
+
+  const handleSaveCustomPage = (savedDef: PageDefinition) => {
+    saveCustomPage(savedDef);
+    setPagesVersion((v) => v + 1);
+    setCurrentPage(savedDef.page);
+    setBoards((prev) => ({
+      ...prev,
+      [savedDef.page]: Object.fromEntries(savedDef.cells.map((c) => [c.id, c.defaultStar ?? 0])),
+    }));
+    setSelectedCellIds((prev) => ({
+      ...prev,
+      [savedDef.page]:
+        savedDef.defaultSelectedCellId ||
+        (savedDef.cells.find((c) => c.isCenter)?.id ?? savedDef.cells[0]?.id ?? 'A'),
+    }));
+    setIsBuilderOpen(false);
+  };
+
+  const handleDeleteCustomPage = (pageNum: number) => {
+    deleteCustomPage(pageNum);
+    setPagesVersion((v) => v + 1);
+    if (currentPage === pageNum) {
+      setCurrentPage(1);
     }
   };
 
@@ -1501,12 +1258,7 @@ export default function App() {
       ...prev,
       [currentPage]: 0,
     }));
-    const blank =
-      currentPage === 1
-        ? BLANK_PAGE_ONE_BOARD
-        : currentPage === 2
-        ? BLANK_PAGE_TWO_BOARD
-        : BLANK_PAGE_THREE_BOARD;
+    const blank = pageConfig.blankBoard;
     setBoards((prev) => ({
       ...prev,
       [currentPage]: blank,
@@ -1651,7 +1403,34 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="brand">JOLEN SIMULATOR</div>
-        <PageDropdown currentPage={currentPage} onSelectPage={handlePageChange} />
+        <div className="header-actions">
+          <button
+            type="button"
+            className="btn-add-page"
+            onClick={handleAddNewPage}
+            title="Create and add a new Awakening Page"
+          >
+            <span className="builder-btn-icon">➕</span>
+            <span className="builder-btn-text">ADD PAGE</span>
+          </button>
+          <button
+            type="button"
+            className="btn-open-builder"
+            onClick={handleOpenBuilderForCurrentPage}
+            title="Open Awakening Page Builder"
+          >
+            <span className="builder-btn-icon">🛠️</span>
+            <span className="builder-btn-text">PAGE BUILDER</span>
+          </button>
+          <PageDropdown
+            currentPage={currentPage}
+            pages={pages}
+            onSelectPage={handlePageChange}
+            onAddNewPage={handleAddNewPage}
+            onOpenBuilder={handleOpenBuilderForCurrentPage}
+            onDeleteCustomPage={handleDeleteCustomPage}
+          />
+        </div>
       </header>
 
       <main className="main">
@@ -1666,8 +1445,13 @@ export default function App() {
 
               <div className="topline-metrics">
                 <span className="metric-tag">
-                  TOTAL: <strong>{totalStars}</strong> / {maxPossibleStars} ★
+                  TOTAL: <strong>{totalStars}</strong> / {activeGoal} ★
                 </span>
+                {activeGoal !== maxPossibleStars && (
+                  <span className="metric-tag max-possible" title={`Maximum possible stars obtainable if every cell reaches 6★ (${activeCells.length} cells × 6★)`}>
+                    MAX POSSIBLE: <strong>{maxPossibleStars}★</strong>
+                  </span>
+                )}
                 <span className="node-count-badge">{activeCells.length} NODES</span>
               </div>
             </div>
@@ -1678,7 +1462,7 @@ export default function App() {
                 type="button"
                 className="board-nav-arrow arrow-left"
                 onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
+                disabled={currentPage === minPage}
                 aria-label="Go to previous awakening page"
                 title={`Go to Page ${currentPage - 1}`}
               >
@@ -1702,18 +1486,24 @@ export default function App() {
 
               <button
                 type="button"
-                className="board-nav-arrow arrow-right"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === 3}
-                aria-label="Go to next awakening page"
-                title={`Go to Page ${currentPage + 1}`}
+                className={`board-nav-arrow arrow-right ${currentPage === maxPage && maxPage < TOTAL_PAGES_IN_GAME ? 'arrow-add' : ''}`}
+                onClick={() => {
+                  if (currentPage < maxPage) {
+                    handlePageChange(currentPage + 1);
+                  } else if (maxPage < TOTAL_PAGES_IN_GAME) {
+                    handleAddNewPage();
+                  }
+                }}
+                disabled={currentPage === maxPage && maxPage >= TOTAL_PAGES_IN_GAME}
+                aria-label={currentPage === maxPage && maxPage < TOTAL_PAGES_IN_GAME ? `Add Page ${maxPage + 1}` : 'Go to next awakening page'}
+                title={currentPage === maxPage && maxPage < TOTAL_PAGES_IN_GAME ? `Add Page ${maxPage + 1} with Page Builder` : `Go to Page ${currentPage + 1}`}
               >
-                ›
+                {currentPage === maxPage && maxPage < TOTAL_PAGES_IN_GAME ? '➕' : '›'}
               </button>
 
               {/* In-Game Bottom Page Indicator on Board */}
-              <div className="board-page-counter" aria-label={`Page ${currentPage} of 17`}>
-                {currentPage} / 17
+              <div className="board-page-counter" aria-label={`Page ${currentPage} of ${TOTAL_PAGES_IN_GAME}`}>
+                {currentPage} / {TOTAL_PAGES_IN_GAME}
               </div>
             </div>
 
@@ -1728,7 +1518,7 @@ export default function App() {
                 <div className="edit-bar-star-picker" role="radiogroup" aria-label={`Select star level for Cell ${selectedDef.id}`}>
                   <button
                     type="button"
-                    className={`star-pick-btn star-0 ${(currentBoard[selectedDef.id] ?? selectedDef.defaultStar) === 0 ? 'is-active' : ''}`}
+                    className={`star-pick-btn star-0 ${(currentBoard[selectedDef.id] ?? selectedDef.defaultStar ?? 0) === 0 ? 'is-active' : ''}`}
                     onClick={() => handleSetCellStar(selectedDef.id, 0)}
                     aria-label={`Set Cell ${selectedDef.id} to empty (0 stars)`}
                     title="Set to empty (0★)"
@@ -1736,7 +1526,7 @@ export default function App() {
                     0★
                   </button>
                   {STARS.map((star) => {
-                    const currentStar = currentBoard[selectedDef.id] ?? selectedDef.defaultStar;
+                    const currentStar = currentBoard[selectedDef.id] ?? selectedDef.defaultStar ?? 0;
                     return (
                       <button
                         key={star}
@@ -1903,11 +1693,7 @@ export default function App() {
             <div className="effects-tab-header">
               <button type="button" className="effects-tab-btn">Cell Effect</button>
               <button type="button" className="effects-tab-btn is-active">
-                {currentPage === 1
-                  ? 'I Awakening Effects'
-                  : currentPage === 2
-                  ? 'II Awakening Effects'
-                  : 'III Awakening Effects'}
+                {pageConfig.romanNumeral} Awakening Effects
               </button>
             </div>
 
@@ -1933,12 +1719,27 @@ export default function App() {
               <div className="thresholds-timeline-wrapper">
                 <div className="timeline-header-label">
                   <div className="target-indicator-text">
-                    PAGE GOAL: <strong>LEVEL {activeGoal}</strong>{' '}
+                    PAGE GOAL: <strong>LEVEL {activeGoal}★</strong>{' '}
                     <span className="target-needed">
-                      {isMaxed ? '(MAX LEVEL REACHED)' : `(${activeGoal - totalStars}★ NEEDED)`}
+                      {isMaxed
+                        ? '(MAX LEVEL REACHED)'
+                        : `(${activeGoal - totalStars}★ NEEDED${pageConfig.isMaxFromCellCount ? ' · ALL 6★' : ''})`}
                     </span>
                   </div>
                 </div>
+
+                {pageConfig.isMaxFromCellCount && (
+                  <div className="cell-max-info-banner">
+                    <span className="banner-icon">ℹ️</span>
+                    <div className="banner-text">
+                      <strong>In-Game Milestones Locked</strong>
+                      <p>
+                        Specific milestone thresholds have not been unlocked in-game yet.
+                        The target is set to the <strong>maximum possible stars ({maxPossibleStars}★)</strong> obtainable from all {activeCells.length} cells.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="thresholds-list" ref={thresholdsListRef}>
                   {activeThresholds.map((t) => {
@@ -2049,7 +1850,7 @@ export default function App() {
                       <>
                         <div className="advisor-header">
                           <span className="advisor-badge compare">
-                            <span className="compare-icon">🔍</span> {hoveredCellId ? 'HOVERED' : 'COMPARING'}: CELL {compareCell.id}
+                            <span className="compare-icon">🔍</span> {hoveredCellId ? 'HOVERED' : 'SELECTED'}: CELL {compareCell.id}
                           </span>
                           {selectedCellId !== compareCell.id && (
                             <button
@@ -2144,6 +1945,14 @@ export default function App() {
         </div>
 
       </main>
+
+      {isBuilderOpen && (
+        <PageBuilder
+          initialPage={builderInitialPage}
+          onClose={() => setIsBuilderOpen(false)}
+          onSavePage={handleSaveCustomPage}
+        />
+      )}
     </div>
   );
 }
